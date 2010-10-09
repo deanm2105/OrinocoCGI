@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Orinoc Stage 2 - Interactive Version
+# Orinoc Stage 3 - CGI Version
 # By Dean McGregor
 
 sub loadValuesToHashTable($);
