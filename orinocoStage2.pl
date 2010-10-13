@@ -578,20 +578,7 @@ sub printShortBookDetails(%) {
 
 #definition of sort for results
 #sort on SalesRank first, then ISBN
-sub myHashSort {
-	#weight non-salesrank items so they end up at the bottom of the list
-	if (!(exists $data{$a}{SalesRank})) {
-		$data{$a}{SalesRank} = 9999999999999999;
-	}
-	if (!(exists $data{$b}{SalesRank})) {
-		$data{$b}{SalesRank} = 9999999999999999;
-	}
-	if ($data{$a}{SalesRank} == $data{$b}{SalesRank}) {
-		return ($data{$a}{isbn} cmp $data{$b}{isbn});
-	} else {
-		return ($data{$a}{SalesRank} <=> $data{$b}{SalesRank});
-	}
-}
+
 
 #check the length of the password
 sub checkValidPassword($) {

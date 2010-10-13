@@ -11,6 +11,8 @@ if (@ARGV == 0) {
 	carpout(*LOG);
 }
 
+$bookFile = "books.json";
+
 sub initProgram() {
 	if (!(-d "./orders")) {
 		mkdir "./orders";
@@ -29,6 +31,136 @@ sub initProgram() {
 		$user = param("currentUser");
 		print hidden(-name=>"currentUser", -value=>"$user");
 	}
+	our %books = loadValuesToHashTable($bookFile);
+}
+
+sub loadValuesToHashTable($) {
+	my ($fileName) = @_;
+	my %hash = ();
+	open(BOOKDB,"$fileName") or die "Cannot open $fileName";
+	$readingAuthors = 0;
+	while ($line = <BOOKDB>) {
+		#if reading authors line by line
+		if ($readingAuthors) {
+			if ($line =~ m/^\s*\],\s*$/) {
+				$readingAuthors = 0;
+				$authorsString =~ s/\s*,\s*$//;
+				
+				if ($authorCount > 2) {
+					$authorsString =~ s/,(.*),\s(.*)$/,$1 & $2/;
+				} else {
+					$authorsString =~ s/,/ &/;
+				}
+				$hash{$currentISBN}{authors} = $authorsString;
+			} elsif ($line =~ m/^\s*"(.*)"\s*/) {
+				$authorCount++;
+				$authorsString = "$authorsString$1, ";
+				$authorsString =~ s/\\(.*)\\/$1/;
+			}
+		} else {
+			#grab the ISBN
+			if ($line =~ m/^\s*"(\d+X?)"\s*:\s*{\s*$/) {
+				$currentISBN = $1;
+			} elsif ($line =~ m/^\s*"authors"\s*:\s*\[\s*$/) {
+				$readingAuthors = 1;
+				$authorsString = "";
+				$authorCount = 0;
+			} elsif ($line =~ m/^\s*"(.*)"\s*:\s*"(.*)",\s*$/) {
+				#pattern match and pull out all data into a hash table
+				$temp = $2;
+				$cat = $1;
+				$temp =~ s/\\//g;
+				$temp =~ s/<[A-Za-z\/]*>//g;
+				$hash{$currentISBN}{$cat} = $temp;
+			}
+		}
+	}	
+	close(BOOKDB);	
+	return %hash;
+}
+
+#function preforms a search based on keywords given
+sub findData(%@) {
+	my $dataRef = shift;
+	my %data = %$dataRef;
+	my $searchTermRef = shift;
+	my @searchTerm = @$searchTermRef;
+	
+	my %termsByCat = getSearchTerms(@searchTerm);
+	my @result = ();
+	#go through all books and fields for search
+	#if they match, add them to the results table
+	foreach $isbn (keys %data) {
+		$match = 1;
+		foreach $key (keys %termsByCat) {
+			if (!exists $data{$isbn}{$key} && $key ne "") {
+				print "Unknown keyword\n";
+				$match = 0;	
+			} else {
+				if (!matches($data{$isbn}, $key, $termsByCat{$key})) {
+					$match = 0;
+				}	
+			}
+		}
+		if ($match) {
+			push @result, $isbn;
+		}
+	}
+	return @result;
+}
+
+#checks that the given book matches all the keywords given for a field
+sub matches(%$@) {
+	$bookRef = shift;
+	%book = %$bookRef;
+	$field = shift;
+	$keywordsRef = shift;
+	@keywords = @$keywordsRef;
+	$matches = 1;
+	foreach $word (@keywords) {
+		if ($word !~ m/^<.*>$/) {		
+			$word =~ s/[\.\*\+\\\{\}\[\]\$\^]+//;
+			if ($field eq "") {
+				if ($word eq "") {
+					$matches=0;
+				} elsif (($book{title} !~ m/\b$word\b/i) and ($book{authors} !~ m/\b$word\b/i)) {
+					$matches=0;
+				}
+			} else {
+				if ($book{$field} !~ m/\b$word\b/i) {
+					$matches=0;
+				}
+			}
+		}
+	}
+	return $matches;
+	
+}
+
+#breaks down search terms into fields
+#returns an associative array of fields->search terms
+sub getSearchTerms(@) {
+	%termByCat = ();
+	$cat = "";
+	@tempArray = ();
+	$termByCat{$cat} = \@tempArray;
+	foreach $term (@searchTerms) {
+		if ($term =~ m/^(.*):(.*)$/i) {
+			if (exists $termByCat{$1}) {
+				$arrayRef = $termByCat{$1};
+				push @$arrayRef, $2;
+			} else {
+				my @catTerms = ();
+				push @catTerms, $2;
+				#funky pointer magic to make multiple arrays
+				$termByCat{$1} = \@catTerms;
+			}
+		} else {
+			$arrayRef = $termByCat{$cat};
+			push @$arrayRef, $term;
+		}	
+	}
+	return %termByCat;
 }
 
 sub printBanner() {
@@ -76,6 +208,51 @@ sub showNewAccountForm() {
 	print submit(-name=>"newAccountSubmit", -value=>"Create Account");
 	print reset(-value=>"Reset Form");
 
+}
+
+sub showSearchBox() {
+	print "<table border=0 width=\"400\">";
+	print "<tr><td width=\"100\">";
+	print a("Search:");
+	print "<td>";
+	print textfield(-name=>"search");
+	print "</table>";
+}
+
+sub printListOfBooks(@$) {
+	my $arrayRef = shift;
+	my @isbns = @$arrayRef;
+	my $width = shift;
+	print "<table border=\"1\" width=\"$width\">";
+	foreach $isbn (@isbns) {
+		print "<tr>";
+		print "<td>";
+		print a($isbn);
+		print "</td></tr>";
+	}
+	print "</table>";
+	
+}
+
+sub myHashSort {
+	#weight non-salesrank items so they end up at the bottom of the list
+	if (!(exists $data{$a}{SalesRank})) {
+		$data{$a}{SalesRank} = 9999999999999999;
+	}
+	if (!(exists $data{$b}{SalesRank})) {
+		$data{$b}{SalesRank} = 9999999999999999;
+	}
+	if ($data{$a}{SalesRank} == $data{$b}{SalesRank}) {
+		return ($data{$a}{isbn} cmp $data{$b}{isbn});
+	} else {
+		return ($data{$a}{SalesRank} <=> $data{$b}{SalesRank});
+	}
+}
+
+sub showSearchResults(@) {
+	my $hashref = shift;
+	my @data = @$hashref;
+	printListOfBooks(\@data, "500");
 }
 
 sub processNewAccount() {
@@ -161,7 +338,7 @@ if (defined param("login")) {
 	if (checkValidUsername(param("username")) && checkValidPassword(param("password")) && verifyPassword(param("username"), param("password"))) {
 		$user = param("username");
 		print hidden(-name=>"currentUser", -value=>$user);
-		#go to main page
+		showSearchBox();
 	} else {
 		showLogonPage();
 	}
@@ -173,6 +350,12 @@ if (defined param("login")) {
 	} else {
 		showNewAccountForm();
 	}
+} elsif (defined param("search") && (param("search") =~ m/(.+)/)) {
+	@searchTerms = split(' ', param("search"));
+	@result = findData(\%books, \@searchTerms);
+	showSearchBox();
+	showSearchResults(\@result);
+	
 } else {
 	showLogonPage();	
 }
