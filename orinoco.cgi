@@ -28,8 +28,8 @@ sub initProgram() {
 		mkdir "./users";
 	} 
 	if (defined param("currentUser") && param("currentUser") ne "") {
-		$user = param("currentUser");
-		print hidden(-name=>"currentUser", -value=>"$user");
+		$currentUser = param("currentUser");
+		print hidden(-name=>"currentUser", -value=>"$currentUser");
 	}
 	our %books = loadValuesToHashTable($bookFile);
 }
@@ -87,7 +87,7 @@ sub findData(%@) {
 	my @searchTerm = @$searchTermRef;
 	
 	my %termsByCat = getSearchTerms(@searchTerm);
-	my @result = ();
+	my %result = ();
 	#go through all books and fields for search
 	#if they match, add them to the results table
 	foreach $isbn (keys %data) {
@@ -103,10 +103,10 @@ sub findData(%@) {
 			}
 		}
 		if ($match) {
-			push @result, $isbn;
+			$result{$isbn} = $data{$isbn};
 		}
 	}
-	return @result;
+	return %result;
 }
 
 #checks that the given book matches all the keywords given for a field
@@ -219,21 +219,6 @@ sub showSearchBox() {
 	print "</table>";
 }
 
-sub printListOfBooks(@$) {
-	my $arrayRef = shift;
-	my @isbns = @$arrayRef;
-	my $width = shift;
-	print "<table border=\"1\" width=\"$width\">";
-	foreach $isbn (@isbns) {
-		print "<tr>";
-		print "<td>";
-		print a($isbn);
-		print "</td></tr>";
-	}
-	print "</table>";
-	
-}
-
 sub myHashSort {
 	#weight non-salesrank items so they end up at the bottom of the list
 	if (!(exists $data{$a}{SalesRank})) {
@@ -249,10 +234,54 @@ sub myHashSort {
 	}
 }
 
-sub showSearchResults(@) {
-	my $hashref = shift;
-	my @data = @$hashref;
-	printListOfBooks(\@data, "500");
+sub showSearchResults(%) {
+	my $hashRef = shift;
+	my %hash = %$hashRef;
+	foreach $isbn (sort myHashSort keys %hash) {
+		push @result, $isbn;
+	}
+	printListOfBooks(\@result, "100%");
+}
+
+sub printListOfBooks(@$) {
+	my $arrayRef = shift;
+	my @isbns = @$arrayRef;
+	my $width = shift;
+	print "<table border=\"1\" width=\"$width\">";
+	foreach $isbn (@isbns) {
+		print "<tr>";
+		if (exists $books{$isbn}{ImageUrlSmall}) {
+			print td(img({src=>"$books{$isbn}{ImageUrlSmall}", width=>"$books{$isbn}{SmallImageWidth}", height=>"$books{$isbn}{SmallImageHeight}"}));		
+		} else {
+			print td();
+		}
+		print td(i($books{$isbn}{title}), "<br>", a($books{$isbn}{authors}));
+		print td("<tt>$books{$isbn}{price}</tt>");
+		print td(submit(-name=>"action $isbn", -value=>"Add"), "<br>", submit(-name=>"action $isbn", -value=>"Details"));
+		print "</tr>";
+	}
+	print "</table>";
+	
+}
+
+sub showDetailsISBN(%$) {
+	my $bookRef = shift;
+	my %book = %$bookRef;
+	my $isbn = shift;
+	my @dontShow = qw(SmallImageHeight MediumImageHeight LargeImageHeight MediumImageWidth ProductDescription MediumImageUrl ImageUrlMedium ImageUrlSmall ImageUrlLarge SmallImageUrl LargeImageWidth SmallImageWidth LargeImageUrl);
+	if (exists $book{ImageUrlLarge}) {
+		print img({src=>"$book{ImageUrlLarge}", width=>"$book{LargeImageWidth}", height=>"$book{LargeImageHeight}"});
+	}
+	print "<table width=\"60%\" border=\"0\">\n";
+	foreach $key (sort keys %book) {
+		#check if the the key is in the don't show array
+		if (!(grep {$_ eq $key} @dontShow)) {
+			print "<tr>";
+			print td($key), td($book{$key});
+			print "</tr>";
+		}	
+	}
+	print "</table>";
 }
 
 sub processNewAccount() {
@@ -269,6 +298,13 @@ sub processNewAccount() {
 		colorText("$userName already exists.");
 		showNewAccountForm();
 	}
+}
+
+sub addToBasket($) {
+	my $isbn = shift;
+	open (BASKET, ">>./baskets/$currentUser") or die "Cannot open basket for $currentUser";
+	print BASKET $isbn . "\n";
+	close (BASKET);
 }
 
 sub checkValidUsername($) {
@@ -334,10 +370,30 @@ printBanner();
 print start_form(-method=>"post", action=>"orinoco.cgi");
 initProgram();
 
-if (defined param("login")) {
+@params = param();
+foreach $p (@params) {
+	if ($p =~ m/^action\s.*$/) {
+		$doAction = $p;
+	}
+}
+
+if (defined param($doAction)){
+	$doAction =~ m/^action\s(.*)$/;
+	$isbn = $1;
+	if (param($doAction) eq "Details") {
+		showDetailsISBN($books{$isbn}, $isbn);
+	} elsif (param($doAction) eq "Add") {
+		addToBasket($isbn);
+		@searchTerms = split(' ', param("search"));
+		my %result = findData(\%books, \@searchTerms);
+		showSearchBox();
+		showSearchResults(\%result);
+	}
+
+} elsif (defined param("login")) {
 	if (checkValidUsername(param("username")) && checkValidPassword(param("password")) && verifyPassword(param("username"), param("password"))) {
-		$user = param("username");
-		print hidden(-name=>"currentUser", -value=>$user);
+		$currentUser = param("username");
+		print hidden(-name=>"currentUser", -value=>$currentUser);
 		showSearchBox();
 	} else {
 		showLogonPage();
@@ -350,11 +406,12 @@ if (defined param("login")) {
 	} else {
 		showNewAccountForm();
 	}
+
 } elsif (defined param("search") && (param("search") =~ m/(.+)/)) {
 	@searchTerms = split(' ', param("search"));
-	@result = findData(\%books, \@searchTerms);
+	my %result = findData(\%books, \@searchTerms);
 	showSearchBox();
-	showSearchResults(\@result);
+	showSearchResults(\%result);
 	
 } else {
 	showLogonPage();	
