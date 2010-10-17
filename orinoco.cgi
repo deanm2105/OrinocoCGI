@@ -12,6 +12,11 @@ if (@ARGV == 0) {
 }
 
 $bookFile = "books.json";
+$basketButton = submit(-name=>"basket", -value=>"Basket");
+$ordersButton = submit(-name=>"orders", -value=>"View Orders");
+$logOffButton = submit(-name=>"logoff", -value=>"Log Off");
+$checkoutButton = submit(-name=>"checkout", -value=>"Checkout");
+
 
 sub initProgram() {
 	if (!(-d "./orders")) {
@@ -219,6 +224,8 @@ sub showSearchBox() {
 	print "</table>";
 }
 
+
+
 sub myHashSort {
 	#weight non-salesrank items so they end up at the bottom of the list
 	if (!(exists $data{$a}{SalesRank})) {
@@ -240,13 +247,92 @@ sub showSearchResults(%) {
 	foreach $isbn (sort myHashSort keys %hash) {
 		push @result, $isbn;
 	}
-	printListOfBooks(\@result, "100%");
+	my @buttonNames = ("Add", "Details");
+	printListOfBooks(\@result, "100%", \@buttonNames, 1);
 }
 
-sub printListOfBooks(@$) {
+sub showConfirmCheckout($) {
+	my $error = shift;
+	if (-e "./baskets/$currentUser") {
+		showBasket();
+		print b("Shipping Details");
+		print "<br>";
+		print "<br>";
+		showShippingDetails();
+		print $error;
+		print "<table>";
+		print "<tr>";
+		print td(a("Credit Card Number: "));
+		print td(textfield(-name=>"creditCardNo"));
+		print "</tr>";
+		print "<tr>";
+		print td(a("Expiry: "));
+		print td(textfield(-name=>"creditCardExp"));
+		print "</tr>";
+		print "</table>";
+		my @buttons = ($basketButton, submit(-name=>"finaliseOrder", -value=>"Finalize Order"), $ordersButton, $logOffButton);
+		showBottomMenu(\@buttons);
+	} else {
+		colorText("Your basket is empty", "red");
+	}
+	
+	
+}
+
+sub showShippingDetails() {
+	open (USER, "./users/$currentUser") or die "Cannot open user file for $currentUser";
+	print "Shipping Details:\n";
+	foreach $line (<USER>) {
+		if ($line =~ m/street=(.*)$/) {
+			$street = $1;
+		} elsif ($line =~ m/city=(.*)$/) {
+			$city = $1;
+		} elsif ($line =~ m/state=(.*)$/) {
+			$state = $1;
+		} elsif ($line =~ m/postcode=(.*)$/) {
+			$postcode = $1;
+		} elsif ($line =~ m/name=(.*)$/) {
+			$name = $1;
+		}
+	}
+	close(USER);
+	print "<tt>$name</tt><br>";
+	print "<tt>$street</tt><br>";
+	print "<tt>$city<tt><br>";
+	chomp $state;
+	print "<tt>$state, $postcode</tt><br>";
+}
+
+sub showBasket() {
+	if (-e "./baskets/$currentUser") {
+		open (BASKET, "./baskets/$currentUser") or die "Cannot open basket for user $currentUser";
+		my @isbns = ();
+		foreach $isbn (<BASKET>) {
+			chomp $isbn;
+			push @isbns, $isbn;
+			$books{$isbn}{price} =~ /\$(.*)/;
+			$tempNum = $1;
+			$totalCost += $tempNum;
+		}
+		my @buttonNames = qw(Drop Details);
+		printListOfBooks(\@isbns, "100%", \@buttonNames, 0);
+		print "<tr>";
+		print td(b(Total)), td(), td(a($totalCost));
+		print "</tr>";
+		close (BASKET);
+	} else {
+		print a("No items in basket");
+	}
+	
+}
+
+sub printListOfBooks(@$@$) {
 	my $arrayRef = shift;
 	my @isbns = @$arrayRef;
 	my $width = shift;
+	$arrayRef = shift;
+	my @buttonNames = @$arrayRef;
+	my $endTable = shift;
 	print "<table border=\"1\" width=\"$width\">";
 	foreach $isbn (@isbns) {
 		print "<tr>";
@@ -257,10 +343,14 @@ sub printListOfBooks(@$) {
 		}
 		print td(i($books{$isbn}{title}), "<br>", a($books{$isbn}{authors}));
 		print td("<tt>$books{$isbn}{price}</tt>");
-		print td(submit(-name=>"action $isbn", -value=>"Add"), "<br>", submit(-name=>"action $isbn", -value=>"Details"));
+		print "<td>";
+		foreach $name (@buttonNames) {
+			print submit(-name=>"action $isbn", -value=>$name), "<br>";
+		}
+		print "</td>";
 		print "</tr>";
 	}
-	print "</table>";
+	print "</table>" if $endTable;
 	
 }
 
@@ -282,6 +372,17 @@ sub showDetailsISBN(%$) {
 		}	
 	}
 	print "</table>";
+	#TODO print buttons down here
+}
+
+sub showBottomMenu(@) {
+	my $arrayRef = shift;
+	my @buttons = @$arrayRef;
+	print "<table border\"0\">";
+	foreach $button (@buttons) {
+		print td($button);
+	}
+	print "</table>";
 }
 
 sub processNewAccount() {
@@ -300,11 +401,85 @@ sub processNewAccount() {
 	}
 }
 
+sub processCheckout($$) {
+	$cardNo = shift;
+	$expiry = shift;
+	if (-e "./orders/NEXT_ORDER_NUMBER") {
+		open (NUM, "./orders/NEXT_ORDER_NUMBER") or die "Cannot open the next order number";
+		$orderNum = <NUM>;
+		chomp $orderNum;
+		close(NUM);
+	} else {
+		$orderNum = 0;
+	}
+	#create a new file for the order
+	open (ORDER_FILE, ">./orders/$orderNum") or die "Cannot create new file $orderNum";
+	print ORDER_FILE "order_time=" . time() . "\n";
+	print ORDER_FILE "credit_card_number=$cardNo\n";
+	print ORDER_FILE "expiry_date=$expiry\n";
+	open (BASKET, "./baskets/$currentUser") or die "Cannot open basket for $currentUser";
+	foreach $isbn (<BASKET>) {
+		if ($isbn ne "") {
+			print ORDER_FILE "$isbn";
+		}
+	}
+	close (BASKET);
+	close(ORDER_FILE);
+	#add the order to the user's record
+	open (USER, ">>./orders/$currentUser") or die "Cannot open $currentUser order records";
+	print USER "$orderNum\n";
+	close (USER);
+	$orderNum++;
+	#update the next order number
+	open (NUM, ">./orders/NEXT_ORDER_NUMBER") or die "Cannot open the next order number";
+	print NUM "$orderNum\n";
+	close(NUM);
+	unlink "./baskets/$currentUser";
+}
+
 sub addToBasket($) {
 	my $isbn = shift;
 	open (BASKET, ">>./baskets/$currentUser") or die "Cannot open basket for $currentUser";
 	print BASKET $isbn . "\n";
 	close (BASKET);
+}
+
+sub dropFromBasket($) {
+	my $isbn = shift;
+	chomp $isbn;
+	if (-e "./baskets/$currentUser") {
+		open (BASKET, "./baskets/$currentUser") or die "Cannot open basket for $currentUser";
+		@basket = <BASKET>;
+		seek BASKET,0,0;
+		$found = 0;
+		$num = 0;
+		foreach $line (<BASKET>) {
+			chomp $line;
+			if ($line eq $isbn && !$found) {
+				$basket[$num] = "";
+				$found = 1;
+			}
+			$num++;
+		}
+		close (BASKET);
+		if ($found) {
+			foreach $line (@basket) {
+				if ($line ne "") {
+					push @newBasket, $line;
+				}
+			}
+			unlink "./baskets/$currentUser";
+			if (scalar @newBasket > 0) {
+				open (BASKET, ">./baskets/$currentUser");
+				foreach $line (@basket) {
+					if ($line ne "") {
+						print BASKET $line
+					}
+				}
+				close (BASKET);
+			}	
+		} 
+	}
 }
 
 sub checkValidUsername($) {
@@ -358,10 +533,13 @@ sub verifyPassword($$) {
 }
 
 
-sub colorText($$) {
+sub colorText($$$) {
 	my $message = shift;
 	my $color = shift;
-	print "<span style=\"color: $color\">$message</span>\n";
+	my $print = shift;
+	my $text = "<span style=\"color: $color\">$message</span>\n";
+	print $text unless $print;
+	return $text;
 }
 
 print header();
@@ -388,13 +566,24 @@ if (defined param($doAction)){
 		my %result = findData(\%books, \@searchTerms);
 		showSearchBox();
 		showSearchResults(\%result);
+		my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
+		showBottomMenu(\@buttons);
+	} elsif (param($doAction) eq "Drop") {
+		dropFromBasket($isbn);
+		showSearchBox();
+		showBasket();
+		my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
+		showBottomMenu(\@buttons);
 	}
 
-} elsif (defined param("login")) {
+} elsif (defined param("login") || defined param("basket")) {
 	if (checkValidUsername(param("username")) && checkValidPassword(param("password")) && verifyPassword(param("username"), param("password"))) {
 		$currentUser = param("username");
 		print hidden(-name=>"currentUser", -value=>$currentUser);
 		showSearchBox();
+		showBasket();
+		my @buttons = ($checkoutButton, $ordersButton, $logOffButton);
+		showBottomMenu(\@buttons);
 	} else {
 		showLogonPage();
 	}
@@ -405,14 +594,14 @@ if (defined param($doAction)){
 		processNewAccount();
 	} else {
 		showNewAccountForm();
-	}
-
+	}	
 } elsif (defined param("search") && (param("search") =~ m/(.+)/)) {
 	@searchTerms = split(' ', param("search"));
 	my %result = findData(\%books, \@searchTerms);
 	showSearchBox();
 	showSearchResults(\%result);
-	
+	my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
+	showBottomMenu(\@buttons);
 } else {
 	showLogonPage();	
 }
