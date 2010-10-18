@@ -16,7 +16,7 @@ $basketButton = submit(-name=>"basket", -value=>"Basket");
 $ordersButton = submit(-name=>"orders", -value=>"View Orders");
 $logOffButton = submit(-name=>"logoff", -value=>"Log Off");
 $checkoutButton = submit(-name=>"checkout", -value=>"Checkout");
-
+$searchButton = submit(-name=>"searchButton", -value=>"Go!");
 
 sub initProgram() {
 	if (!(-d "./orders")) {
@@ -221,6 +221,7 @@ sub showSearchBox() {
 	print a("Search:");
 	print "<td>";
 	print textfield(-name=>"search");
+	print $searchButton;
 	print "</table>";
 }
 
@@ -277,6 +278,13 @@ sub showConfirmCheckout($) {
 	}
 	
 	
+}
+
+sub showMainPage() {
+	showSearchBox();
+	showBasket();
+	my @buttons = ($checkoutButton, $ordersButton, $logOffButton);
+	showBottomMenu(\@buttons);
 }
 
 sub showShippingDetails() {
@@ -378,7 +386,7 @@ sub showDetailsISBN(%$) {
 sub showBottomMenu(@) {
 	my $arrayRef = shift;
 	my @buttons = @$arrayRef;
-	print "<table border\"0\">";
+	print "<table border=\"0\">";
 	foreach $button (@buttons) {
 		print td($button);
 	}
@@ -532,6 +540,33 @@ sub verifyPassword($$) {
 	}
 }
 
+#checks a valid credit card number is a string of 16 digits
+sub validateCreditCard($) {
+	my $cardNo = shift;
+	chomp $cardNo;
+	if (length($cardNo) == 16) {
+		if ($cardNo !~ m/[0-9]{16}/) {
+			colorText("Invalid credit card number - must be 16 digits.", "red");
+			return 0;
+		}
+	} else {
+		colorText("Invalid credit card number - must be 16 digits.", "red");
+		return 0;
+	}
+	return 1;
+}
+
+#checks the formatting of the expiry is mm/yy
+sub checkExpiry($) {
+	my $expiry = shift;
+	chomp $expiry;
+	if ($expiry !~ m/[0-9]{2}\/[0-9]{2}/) {
+		colorText("Invalid expiry date - must be mm/yy, e.g. 11/04.", "red");
+		return 0;
+	}
+	return 1;
+}
+
 
 sub colorText($$$) {
 	my $message = shift;
@@ -576,7 +611,7 @@ if (defined param($doAction)){
 		showBottomMenu(\@buttons);
 	}
 
-} elsif (defined param("login") || defined param("basket")) {
+} elsif (defined param("login")) {
 	if (checkValidUsername(param("username")) && checkValidPassword(param("password")) && verifyPassword(param("username"), param("password"))) {
 		$currentUser = param("username");
 		print hidden(-name=>"currentUser", -value=>$currentUser);
@@ -587,6 +622,10 @@ if (defined param($doAction)){
 	} else {
 		showLogonPage();
 	}
+} elsif (defined param("basket")) {
+	showMainPage();
+} elsif (defined param("checkout")) {
+	showConfirmCheckout(0);
 } elsif (defined param("new_account")) {	
 	showNewAccountForm();
 } elsif (defined param("newAccountSubmit")) {
@@ -595,13 +634,20 @@ if (defined param($doAction)){
 	} else {
 		showNewAccountForm();
 	}	
-} elsif (defined param("search") && (param("search") =~ m/(.+)/)) {
+} elsif (defined param("finaliseOrder")) {
+	if (validateCreditCard(param("creditCardNo")) && checkExpiry(param("creditCardExp"))) {
+		processCheckout(param("creditCardNo"), param("creditCardExp"));
+		showMainPage();
+	} else {
+		showConfirmCheckout(0);
+	}
+} elsif ((defined param("search") && (param("search") =~ m/(.+)/)) || defined param("searchButton")) {
 	@searchTerms = split(' ', param("search"));
 	my %result = findData(\%books, \@searchTerms);
 	showSearchBox();
-	showSearchResults(\%result);
-	my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
-	showBottomMenu(\@buttons);
+    showSearchResults(\%result);
+    my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
+    showBottomMenu(\@buttons);
 } else {
 	showLogonPage();	
 }
