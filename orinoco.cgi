@@ -327,11 +327,65 @@ sub showBasket() {
 		print "<tr>";
 		print td(b(Total)), td(), td(a($totalCost));
 		print "</tr>";
+		print "</table>";
 		close (BASKET);
 	} else {
 		print a("No items in basket");
 	}
 	
+}
+
+sub viewOrders() {
+	if (!(-e "./orders/$currentUser")) {
+		colorText("No orders for $currentUser", "red");
+		showMainPage();
+	} else {
+		open (ORDERS, "./orders/$currentUser") or die ("Cannot open orders file for $currentUser");
+		foreach $number (<ORDERS>) {
+			chomp $number;
+			printOrderDetails($number);
+		}
+		close (ORDERS);
+		print "<br>";
+	}
+}
+
+sub printOrderDetails($) {
+	my $number = shift;
+	open (CURRENT_ORDER, "./orders/$number") or die "Cannot open order number $number";
+	$line = <CURRENT_ORDER>;
+	$line =~ /.*=(.*)/;
+	$time = $1;
+	chomp $time;
+	$timeStr = localtime ($time);
+	print "<table border=\"0\">";
+	print "<tr>";
+	print td(a("Order #$number - $timeStr")), "<br>";
+	$line = <CURRENT_ORDER>;
+	$line =~ /.*=(.*)/;
+	$cardNo = $1;
+	$line = <CURRENT_ORDER>;
+	$line =~ /.*=(.*)/;
+	$expiry = $1;
+	chomp $cardNo;
+	chomp $expiry;
+	print "<tr>";
+	print td(a("Credit Card Number: $cardNo (Expiry $expiry)")), "<br>";
+	print "<tr>";
+	$totalCost = 0;
+	while ($line = <CURRENT_ORDER>) {
+		chomp $line;
+		push @isbns, $line;
+		$books{$isbn}{price} =~ /\$(.*)/;
+		$tempNum = $1;
+		$totalCost += $tempNum;
+	}
+	printListOfBooks(\@isbns, "100%", (), 0);
+	print "<tr>";
+	print td(b(Total)), td(), td(a($totalCost));
+	print "</tr>";
+	print "</table>";
+	close (CURRENT_ORDER);
 }
 
 sub printListOfBooks(@$@$) {
@@ -351,11 +405,13 @@ sub printListOfBooks(@$@$) {
 		}
 		print td(i($books{$isbn}{title}), "<br>", a($books{$isbn}{authors}));
 		print td("<tt>$books{$isbn}{price}</tt>");
-		print "<td>";
-		foreach $name (@buttonNames) {
-			print submit(-name=>"action $isbn", -value=>$name), "<br>";
+		if (scalar @buttonNames > 0) {
+			print "<td>";
+			foreach $name (@buttonNames) {
+				print submit(-name=>"action $isbn", -value=>$name), "<br>";
+			}
+			print "</td>";	
 		}
-		print "</td>";
 		print "</tr>";
 	}
 	print "</table>" if $endTable;
@@ -641,6 +697,16 @@ if (defined param($doAction)){
 	} else {
 		showConfirmCheckout(0);
 	}
+} elsif (defined param("orders")) {
+	showSearchBox();
+	viewOrders();
+	my @buttons = ($basketButton, $checkoutButton, $logOffButton);
+    showBottomMenu(\@buttons);
+} elsif (defined param("logoff")) {
+	$currentUser = "";
+	print hidden(-name=>"currentUser", -value=>$currentUser);
+	colorText ("Sucessfully logged out.", "green", "");
+	showLogonPage();
 } elsif ((defined param("search") && (param("search") =~ m/(.+)/)) || defined param("searchButton")) {
 	@searchTerms = split(' ', param("search"));
 	my %result = findData(\%books, \@searchTerms);
