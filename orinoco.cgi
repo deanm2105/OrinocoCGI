@@ -169,8 +169,9 @@ sub getSearchTerms(@) {
 }
 
 sub printBanner() {
+	print "<div id=\"header\">";
 	print h1("orinoco.com");
-	print "<br><br>\n";
+	print "</div>";
 }
 
 sub showLogonPage() {
@@ -436,7 +437,9 @@ sub showDetailsISBN(%$) {
 		}	
 	}
 	print "</table>";
-	#TODO print buttons down here
+	print hidden(-name=>"currentPage", -value=>"details $isbn");
+	my @buttons = (submit(-name=>"action $isbn", -value=>"Add"), $checkoutButton, $ordersButton, $logOffButton);
+	showBottomMenu(\@buttons);
 }
 
 sub showBottomMenu(@) {
@@ -634,7 +637,10 @@ sub colorText($$$) {
 }
 
 print header();
-print start_html("orinoco.com");
+print start_html(-title=>"orinoco.com", 
+				-style => { -src => "main.css",
+                             -type => "text/css",
+                           },);
 printBanner();
 print start_form(-method=>"post", action=>"orinoco.cgi");
 initProgram();
@@ -653,12 +659,19 @@ if (defined param($doAction)){
 		showDetailsISBN($books{$isbn}, $isbn);
 	} elsif (param($doAction) eq "Add") {
 		addToBasket($isbn);
-		@searchTerms = split(' ', param("search"));
-		my %result = findData(\%books, \@searchTerms);
-		showSearchBox();
-		showSearchResults(\%result);
-		my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
-		showBottomMenu(\@buttons);
+		if (defined param("currentPage")) {
+			$temp = param("currentPage");
+			$temp = /details\s(.*)/;
+			$newIsbn = $1;
+			showDetailsISBN($books{$newIsbn}, $newIsbn);
+		} else {
+			@searchTerms = split(' ', param("search"));
+			my %result = findData(\%books, \@searchTerms);
+			showSearchBox();
+			showSearchResults(\%result);
+			my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
+			showBottomMenu(\@buttons);
+		}
 	} elsif (param($doAction) eq "Drop") {
 		dropFromBasket($isbn);
 		showSearchBox();
