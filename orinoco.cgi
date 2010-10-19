@@ -170,26 +170,27 @@ sub getSearchTerms(@) {
 
 sub printBanner() {
 	print "<div id=\"header\">";
-	print h1("orinoco.com");
+	print img({src=>"images/header.jpg", width=>"449", height=>"100"});
 	print "</div>";
 }
 
 sub showLogonPage() {
-	print "<table border=\"0\" width=\"200\">\n";
+	print "<div id=\"login\">";
+	print "<table border=\"0\" width=\"250\">\n";
 	print "<tr>";
 	print "<td width=\"100\">";
 	print a("Username:");
 	print "</td><td width=\"100\">";
-	print textfield(-name=>"username");
+	print textfield(-name=>"username", -style=>"width:95%;");
 	print "<tr>";
 	print "<td width=\"100\">";
 	print a("Password:");
-	print "</td><td width=\"100\">";
-	print password_field(-name=>"password");
+	print "</td><td width=\"100\" align=\"center\">";
+	print password_field(-name=>"password", -style=>"width:95%;");
 	print "</table>\n";
 	print submit(-name=>"login", -value=>"Login");
 	print submit(-name=>"new_account", -value=>"New Account");
-
+	print "</div>";
 }
 
 sub showNewAccountForm() {
@@ -217,16 +218,26 @@ sub showNewAccountForm() {
 }
 
 sub showSearchBox() {
-	print "<table border=0 width=\"400\">";
+	print "<div class=\"topMenu\">";
+	print "<table border=0 width=\"450\" align=\"center\">";
 	print "<tr><td width=\"100\">";
 	print a("Search:");
 	print "<td>";
-	print textfield(-name=>"search");
+	print textfield(-name=>"search", style=>"width:260px;");
 	print $searchButton;
 	print "</table>";
+	print "</div>";
 }
 
-
+sub showSearchResults(%) {
+	my $hashRef = shift;
+	my %data = %$hashRef;
+	foreach $isbn (reverse sort myHashSort keys %data) {
+		push @result, $isbn;
+	}
+	my @buttonNames = ("Add", "Details");
+	printListOfBooks(\@result, "100%", \@buttonNames, 1);
+}
 
 sub myHashSort {
 	#weight non-salesrank items so they end up at the bottom of the list
@@ -237,20 +248,10 @@ sub myHashSort {
 		$data{$b}{SalesRank} = 9999999999999999;
 	}
 	if ($data{$a}{SalesRank} == $data{$b}{SalesRank}) {
-		return ($data{$a}{isbn} cmp $data{$b}{isbn});
+		return ($a cmp $b);
 	} else {
 		return ($data{$a}{SalesRank} <=> $data{$b}{SalesRank});
 	}
-}
-
-sub showSearchResults(%) {
-	my $hashRef = shift;
-	my %hash = %$hashRef;
-	foreach $isbn (sort myHashSort keys %hash) {
-		push @result, $isbn;
-	}
-	my @buttonNames = ("Add", "Details");
-	printListOfBooks(\@result, "100%", \@buttonNames, 1);
 }
 
 sub showConfirmCheckout($) {
