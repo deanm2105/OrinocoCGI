@@ -426,7 +426,9 @@ sub showDetailsISBN(%$) {
 	my $isbn = shift;
 	my @dontShow = qw(SmallImageHeight MediumImageHeight LargeImageHeight MediumImageWidth ProductDescription MediumImageUrl ImageUrlMedium ImageUrlSmall ImageUrlLarge SmallImageUrl LargeImageWidth SmallImageWidth LargeImageUrl);
 	if (exists $book{ImageUrlLarge}) {
+		print "<div id=\"bookImage\">";
 		print img({src=>"$book{ImageUrlLarge}", width=>"$book{LargeImageWidth}", height=>"$book{LargeImageHeight}"});
+		print "</div>";
 	}
 	print "<table width=\"60%\" border=\"0\">\n";
 	foreach $key (sort keys %book) {
@@ -439,7 +441,7 @@ sub showDetailsISBN(%$) {
 	}
 	print "</table>";
 	print hidden(-name=>"currentPage", -value=>"details $isbn");
-	my @buttons = (submit(-name=>"action $isbn", -value=>"Add"), $checkoutButton, $ordersButton, $logOffButton);
+	my @buttons = ($basketButton, submit(-name=>"action $isbn", -value=>"Add"), $checkoutButton, $ordersButton, $logOffButton);
 	showBottomMenu(\@buttons);
 }
 
