@@ -21,23 +21,15 @@
 	margin-left:auto;
 	margin-right:auto;
 	width:250px;
-	background:url(images/backimage.jpg) repeat;	
+	background:#D9F7FF;	
 }
 
 #bookImage {
-	background:url(images/backimage.jpg) repeat;
+	margin-left:auto; 
+	margin-right:auto;
 }
 
 table {
 	margin-left:auto; 
 	margin-right:auto;
-}
-
-#basketMessage {
-	text-align:center;
-	font-size:larger;
-}
-
-.errorText {
-	text-align:center;
 }

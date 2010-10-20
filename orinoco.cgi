@@ -194,8 +194,8 @@ sub showLogonPage() {
 }
 
 sub showNewAccountForm() {
-	my @textFields = qw(username password name street city state postcode email);
-	my @fields = ("User Name", "Password", "Full Name", "Street", "City/Suburb", "State", "Postcode", "Email Address");
+	my @textFields = qw(password name street city state postcode email);
+	my @fields = ("Password", "Full Name", "Street", "City/Suburb", "State", "Postcode", "Email Address");
 	print "<table border=\"0\" width=\"300\">\n";
 	$count = 0;
 	foreach $title (@fields) {
@@ -204,16 +204,16 @@ sub showNewAccountForm() {
 		print a("$title:");
 		print "</td><td width=\"100\">";
 		if ($title eq "Password") {
-			print password_field(-name=>"$textFields[$count]");
+			print password_field(-name=>"$fields[$count]");
 		} else {
-			print textfield(-name=>"$textFields[$count]");
+			print textfield(-name=>"$fields[$count]");
 		}
 		print "</tr>";
 		$count++;
 	}
 	print "</table>";
-	my @buttons = (submit(-name=>"newAccountSubmit", -value=>"Create Account"), reset(-value=>"Reset Form"));
-    showBottomMenu(\@buttons);
+	print submit(-name=>"newAccountSubmit", -value=>"Create Account");
+	print reset(-value=>"Reset Form");
 
 }
 
@@ -232,13 +232,8 @@ sub showSearchBox() {
 sub showSearchResults(%) {
 	my $hashRef = shift;
 	my %data = %$hashRef;
-	$numKeys = keys %data;
-	if ($numKeys == 0) {
-		colorText("No books matched", "red");
-	} else {
-		foreach $isbn (reverse sort myHashSort keys %data) {
-			push @result, $isbn;
-		}
+	foreach $isbn (reverse sort myHashSort keys %data) {
+		push @result, $isbn;
 	}
 	my @buttonNames = ("Add", "Details");
 	printListOfBooks(\@result, "100%", \@buttonNames, 1);
@@ -320,9 +315,6 @@ sub showShippingDetails() {
 
 sub showBasket() {
 	if (-e "./baskets/$currentUser") {
-		print "<div id=\"basketMessage\">";
-		print b("Basket:"), "<br>";
-		print "</div>";
 		open (BASKET, "./baskets/$currentUser") or die "Cannot open basket for user $currentUser";
 		my @isbns = ();
 		foreach $isbn (<BASKET>) {
@@ -333,17 +325,14 @@ sub showBasket() {
 			$totalCost += $tempNum;
 		}
 		my @buttonNames = qw(Drop Details);
-		printListOfBooks(\@isbns, "80%", \@buttonNames, 0);
+		printListOfBooks(\@isbns, "100%", \@buttonNames, 0);
 		print "<tr>";
-		$priceString = sprintf("\$%.2f", $totalCost);
-		print td(b(Total)), td(), td("<tt>$priceString</tt>");
+		print td(b(Total)), td(), td(a($totalCost));
 		print "</tr>";
 		print "</table>";
 		close (BASKET);
 	} else {
-		print "<div id=\"basketMessage\">";
 		print a("No items in basket");
-		print "</div>";
 	}
 	
 }
@@ -393,10 +382,9 @@ sub printOrderDetails($) {
 		$tempNum = $1;
 		$totalCost += $tempNum;
 	}
-	printListOfBooks(\@isbns, "60%", (), 0);
+	printListOfBooks(\@isbns, "100%", (), 0);
 	print "<tr>";
-	$priceString = sprintf("\$%.2f", $totalCost);
-	print td(b(Total)), td(), td("<tt>$priceString</tt>");
+	print td(b(Total)), td(), td(a($totalCost));
 	print "</tr>";
 	print "</table>";
 	close (CURRENT_ORDER);
@@ -437,15 +425,12 @@ sub showDetailsISBN(%$) {
 	my %book = %$bookRef;
 	my $isbn = shift;
 	my @dontShow = qw(SmallImageHeight MediumImageHeight LargeImageHeight MediumImageWidth ProductDescription MediumImageUrl ImageUrlMedium ImageUrlSmall ImageUrlLarge SmallImageUrl LargeImageWidth SmallImageWidth LargeImageUrl);
-	print "<table width=\"60%\" border=\"0\" align=\"center\">\n";
 	if (exists $book{ImageUrlLarge}) {
-		print "<tr><td colspan=\"2\" align=\"center\">";
 		print "<div id=\"bookImage\">";
 		print img({src=>"$book{ImageUrlLarge}", width=>"$book{LargeImageWidth}", height=>"$book{LargeImageHeight}"});
 		print "</div>";
-		print "</td></tr>";
-		
 	}
+	print "<table width=\"60%\" border=\"0\">\n";
 	foreach $key (sort keys %book) {
 		#check if the the key is in the don't show array
 		if (!(grep {$_ eq $key} @dontShow)) {
@@ -589,7 +574,7 @@ sub checkValidUsername($) {
 
 sub checkValidPassword($) {
 	my $password = shift;
-	if (length($password) < 5) {
+	if (length($password) <= 5) {
 		colorText("Invalid password: passwords must contain at least 5 characters.", "red");
 		return 0;
 	} else {
@@ -644,19 +629,12 @@ sub checkExpiry($) {
 	return 1;
 }
 
-sub checkUserExists($) {
-	my $user = shift;
-	if ((-e "./users/$user")) {
-		colorText("'$user' already exists.", "red");
-	}
-	return (-e "./users/$user");
-}
 
 sub colorText($$$) {
 	my $message = shift;
 	my $color = shift;
 	my $print = shift;
-	my $text = "<div class=\"errorText\">\n\t<span style=\"color: $color\">$message</span>\n</div>";
+	my $text = "<span style=\"color: $color\">$message</span>\n";
 	print $text unless $print;
 	return $text;
 }
@@ -723,11 +701,8 @@ if (defined param($doAction)){
 } elsif (defined param("new_account")) {	
 	showNewAccountForm();
 } elsif (defined param("newAccountSubmit")) {
-	if (checkValidPassword(param("password")) && !checkUserExists(param("username")) && checkValidUsername(param("username"))) {
+	if (checkValidPassword(param("password"))) {
 		processNewAccount();
-		$currentUser = param("username");
-		print hidden(-name=>"currentUser", -value=>$currentUser);
-		showMainPage();
 	} else {
 		showNewAccountForm();
 	}	
