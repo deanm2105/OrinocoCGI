@@ -350,9 +350,10 @@ sub showBasket() {
 
 sub viewOrders() {
 	if (!(-e "./orders/$currentUser")) {
+        showSearchBox();
 		colorText("No orders for $currentUser", "red");
-		showMainPage();
 	} else {
+        showSearchBox();
 		open (ORDERS, "./orders/$currentUser") or die ("Cannot open orders file for $currentUser");
 		foreach $number (<ORDERS>) {
 			chomp $number;
@@ -739,7 +740,6 @@ if (defined param($doAction)){
 		showConfirmCheckout(0);
 	}
 } elsif (defined param("orders")) {
-	showSearchBox();
 	viewOrders();
 	my @buttons = ($basketButton, $checkoutButton, $logOffButton);
     showBottomMenu(\@buttons);
