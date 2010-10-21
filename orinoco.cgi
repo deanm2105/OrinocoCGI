@@ -196,6 +196,7 @@ sub showLogonPage() {
 sub showNewAccountForm() {
 	my @textFields = qw(username password name street city state postcode email);
 	my @fields = ("User Name", "Password", "Full Name", "Street", "City/Suburb", "State", "Postcode", "Email Address");
+    print "<div id=\"content\">";
 	print "<table border=\"0\" width=\"300\">\n";
 	$count = 0;
 	foreach $title (@fields) {
@@ -214,25 +215,30 @@ sub showNewAccountForm() {
 	print "</table>";
 	my @buttons = (submit(-name=>"newAccountSubmit", -value=>"Create Account"), reset(-value=>"Reset Form"));
     showBottomMenu(\@buttons);
-
+    print "</div>";
 }
 
 sub showSearchBox() {
 	print "<div class=\"topMenu\">";
-	print "<table border=0 width=\"450\" align=\"center\">";
-	print "<tr><td width=\"100\">";
-	print a("Search:");
+	print "<table border=0 width=\"450\" id=\"searchTable\">";
+	print "<tr><td align=\"right\">";
+	print b("Search:");
 	print "<td>";
 	print textfield(-name=>"search", style=>"width:260px;");
 	print $searchButton;
 	print "</table>";
 	print "</div>";
+	print "<div class=\"topMenu\" style=\"text-align:right\">";
+    print b("Currently logged in as: '$currentUser'");
+    print $logOffButton;
+    print "</div>";
 }
 
 sub showSearchResults(%) {
 	my $hashRef = shift;
 	my %data = %$hashRef;
 	$numKeys = keys %data;
+    print "<div id=\"content\">";
 	if ($numKeys == 0) {
 		colorText("No books matched", "red");
 	} else {
@@ -242,6 +248,7 @@ sub showSearchResults(%) {
 	}
 	my @buttonNames = ("Add", "Details");
 	printListOfBooks(\@result, "100%", \@buttonNames, 1);
+    print "</div>";
 }
 
 sub myHashSort {
@@ -261,6 +268,8 @@ sub myHashSort {
 
 sub showConfirmCheckout($) {
 	my $error = shift;
+    showSearchBox();
+    print "<div id=\"content\">";
 	if (-e "./baskets/$currentUser") {
 		showBasket();
 		print b("Shipping Details");
@@ -278,25 +287,27 @@ sub showConfirmCheckout($) {
 		print td(textfield(-name=>"creditCardExp"));
 		print "</tr>";
 		print "</table>";
-		my @buttons = ($basketButton, submit(-name=>"finaliseOrder", -value=>"Finalize Order"), $ordersButton, $logOffButton);
-		showBottomMenu(\@buttons);
+	    my @buttons = ($basketButton, submit(-name=>"finaliseOrder", -value=>"Finalize Order"), $ordersButton, $logOffButton);
+	    showBottomMenu(\@buttons);
 	} else {
 		colorText("Your basket is empty", "red");
-	}
-	
-	
+	    my @buttons = ($basketButton, $ordersButton, $logOffButton);
+	    showBottomMenu(\@buttons);
+	}	
+    print "</div>";	
 }
 
 sub showMainPage() {
 	showSearchBox();
+    print "<div id=\"content\">";
 	showBasket();
 	my @buttons = ($checkoutButton, $ordersButton, $logOffButton);
 	showBottomMenu(\@buttons);
+    print "</div>";
 }
 
 sub showShippingDetails() {
 	open (USER, "./users/$currentUser") or die "Cannot open user file for $currentUser";
-	print "Shipping Details:\n";
 	foreach $line (<USER>) {
 		if ($line =~ m/street=(.*)$/) {
 			$street = $1;
@@ -351,9 +362,11 @@ sub showBasket() {
 sub viewOrders() {
 	if (!(-e "./orders/$currentUser")) {
         showSearchBox();
+        print "<div id=\"content\">";
 		colorText("No orders for $currentUser", "red");
 	} else {
         showSearchBox();
+        print "<div id=\"content\">";
 		open (ORDERS, "./orders/$currentUser") or die ("Cannot open orders file for $currentUser");
 		foreach $number (<ORDERS>) {
 			chomp $number;
@@ -362,6 +375,7 @@ sub viewOrders() {
 		close (ORDERS);
 		print "<br>";
 	}
+    print "</div>";
 }
 
 sub printOrderDetails($) {
@@ -438,6 +452,8 @@ sub showDetailsISBN(%$) {
 	my %book = %$bookRef;
 	my $isbn = shift;
 	my @dontShow = qw(SmallImageHeight MediumImageHeight LargeImageHeight MediumImageWidth ProductDescription MediumImageUrl ImageUrlMedium ImageUrlSmall ImageUrlLarge SmallImageUrl LargeImageWidth SmallImageWidth LargeImageUrl);
+    showSearchBox();
+    print "<div id=\"content\">";
 	print "<table width=\"60%\" border=\"0\" align=\"center\">\n";
 	if (exists $book{ImageUrlLarge}) {
 		print "<tr><td colspan=\"2\" align=\"center\">";
@@ -459,6 +475,7 @@ sub showDetailsISBN(%$) {
 	print hidden(-name=>"currentPage", -value=>"details $isbn");
 	my @buttons = ($basketButton, submit(-name=>"action $isbn", -value=>"Add"), $checkoutButton, $ordersButton, $logOffButton);
 	showBottomMenu(\@buttons);
+    print "</div>";
 }
 
 sub showBottomMenu(@) {
