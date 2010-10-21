@@ -32,7 +32,7 @@ sub initProgram() {
 	if (!(-d "./users")) {
 		mkdir "./users";
 	} 
-	if (defined param("currentUser") && param("currentUser") ne "") {
+	if (defined param("currentUser") && param("currentUser") ne "" && !(defined param("logoff"))) {
 		$currentUser = param("currentUser");
 		print hidden(-name=>"currentUser", -value=>"$currentUser");
 	}
@@ -400,11 +400,12 @@ sub printOrderDetails($) {
 	print "<tr>";
 	print td(a("Credit Card Number: $cardNo (Expiry $expiry)")), "<br>";
 	print "<tr>";
-	$totalCost = 0;
+    my @isbns = ();
+	my $totalCost = 0;
 	while ($line = <CURRENT_ORDER>) {
 		chomp $line;
 		push @isbns, $line;
-		$books{$isbn}{price} =~ /\$(.*)/;
+		$books{$line}{price} =~ /\$(.*)/;
 		$tempNum = $1;
 		$totalCost += $tempNum;
 	}
@@ -761,15 +762,17 @@ if (defined param($doAction)){
 	my @buttons = ($basketButton, $checkoutButton, $logOffButton);
     showBottomMenu(\@buttons);
 } elsif (defined param("logoff")) {
-	$currentUser = "";
-	print hidden(-name=>"currentUser", -value=>$currentUser);
 	colorText ("Sucessfully logged out.", "green", "");
 	showLogonPage();
 } elsif ((defined param("search") && (param("search") =~ m/(.+)/)) || defined param("searchButton")) {
 	@searchTerms = split(' ', param("search"));
 	my %result = findData(\%books, \@searchTerms);
 	showSearchBox();
-    showSearchResults(\%result);
+    if (scalar @searchTerms > 0) {
+        showSearchResults(\%result);
+    } else {
+        colorText("No search terms entered!", "red", "");
+    }
     my @buttons = ($basketButton, $checkoutButton, $ordersButton, $logOffButton);
     showBottomMenu(\@buttons);
 } else {
