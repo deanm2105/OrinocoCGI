@@ -14,6 +14,7 @@ if (@ARGV == 0) {
 $bookFile = "books.json";
 $basketButton = submit(-name=>"basket", -value=>"Basket");
 $ordersButton = submit(-name=>"orders", -value=>"View Orders");
+$logOffButton = submit(-name=>"logoff", -value=>"Log Off");
 $checkoutButton = submit(-name=>"checkout", -value=>"Checkout");
 $searchButton = submit(-name=>"searchButton", -value=>"Go!");
 
@@ -241,8 +242,7 @@ sub showSearchResults(%) {
 	if ($numKeys == 0) {
 		colorText("No books matched", "red");
 	} else {
-		foreach $isbn (sort bySalesRank keys %data) {
-            print STDERR "$data{$isbn}{SalesRank}\n";
+		foreach $isbn (reverse sort myHashSort keys %data) {
 			push @result, $isbn;
 		}
 	}
@@ -251,12 +251,19 @@ sub showSearchResults(%) {
     print "</div>";
 }
 
-sub bySalesRank {
-		my $max_sales_rank = 100000000;
-		my $s1 = $book_details{$a}{SalesRank} || $max_sales_rank;
-		my $s2 = $book_details{$b}{SalesRank} || $max_sales_rank;
-		return $a cmp $b if $s1 == $s2;
-		return $s1 <=> $s2;
+sub myHashSort {
+	#weight non-salesrank items so they end up at the bottom of the list
+	if (!(exists $data{$a}{SalesRank})) {
+		$data{$a}{SalesRank} = 9999999999999999;
+	}
+	if (!(exists $data{$b}{SalesRank})) {
+		$data{$b}{SalesRank} = 9999999999999999;
+	}
+	if ($data{$a}{SalesRank} == $data{$b}{SalesRank}) {
+		return ($a cmp $b);
+	} else {
+		return ($data{$a}{SalesRank} <=> $data{$b}{SalesRank});
+	}
 }
 
 sub showConfirmCheckout($) {
